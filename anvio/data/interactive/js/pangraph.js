@@ -1542,12 +1542,12 @@ function main () {
     $('#jsonDownload').on('click', async function() {
       var csv = JSON.stringify(data);
       var blob = new Blob([csv]);
-      downloadBlob(blob,  "pan_graph" + ".json");
+      downloadBlob(blob,  pass_project_name + ".json");
     });
 
     $('#svgDownload').on('click', async function() {
       var blob = new Blob([$('#svgbox')[0].innerHTML]);
-      downloadBlob(blob, "pan_graph" + ".svg");
+      downloadBlob(blob, pass_project_name + ".svg");
     });
 
     $('#searchadd').on('click', function() {
