@@ -1063,7 +1063,7 @@ class Pangraph():
         # learn what gene annotation sources are present across all genomes
         self.functional_annotation_sources_available = DBInfo(self.genomes_storage_db, expecting='genomestorage').get_functional_annotation_sources()
 
-        self.priority_genome = 'wPip'
+        self.priority_genome = ''
 
         # this is the dictionary that wil keep all data that is going to be loaded
         # from anvi'o artifacts
@@ -1364,11 +1364,21 @@ class Pangraph():
 
         draw = {genome: {y: info[genome][y] for y in info[genome].keys() if y == 'draw'} for genome in info.keys()}
 
+        # print(draw)
+
         if not self.initial_graph.has_edge(*(gene_cluster_i, gene_cluster_j)):
             self.initial_graph.add_edge(
                 *(gene_cluster_i, gene_cluster_j),
                 weight=1 + weight_add,
                 genome=draw,
+                bended=[],
+                direction='R'
+            )
+
+            self.initial_graph.add_edge(
+                *(gene_cluster_j, gene_cluster_i),
+                weight=0,
+                genome={},
                 bended=[],
                 direction='R'
             )
@@ -1423,32 +1433,6 @@ class Pangraph():
 
         self.run.warning(None, header="Building maximum branching graph M of G", lc="green")
 
-        add_start = []
-        for node in self.pangenome_graph.nodes():
-            if len(list(self.pangenome_graph.predecessors(node))) == 0:
-                add_start.append(node)
-
-        self.pangenome_graph.add_node(
-            'start',
-            name='start',
-            pos=(0, 0),
-            weight=len(self.genome_coloring.keys()),
-            genome={genome: {'draw': 'on'} for genome in self.genome_coloring.keys()}
-        )
-
-        for u in add_start:
-
-            weight = self.pangenome_graph.nodes[u]['weight']
-            genomes = self.pangenome_graph.nodes[u]['genome'].keys()
-
-            self.pangenome_graph.add_edge(
-                *('start', u),
-                genome={genome: {'draw': 'on'} for genome in genomes},
-                weight=weight,
-                bended=[],
-                direction='R'
-            )
-
         selfloops = list(nx.selfloop_edges(self.pangenome_graph))
         self.run.info_single(f"Found and removed {pp(len(selfloops))} selfloop edge(s)")
         self.pangenome_graph.remove_edges_from(selfloops)
@@ -1456,6 +1440,32 @@ class Pangraph():
         self.edmonds_graph = nx.algorithms.tree.branchings.maximum_spanning_arborescence(self.pangenome_graph, attr="weight")
         nx.set_edge_attributes(self.edmonds_graph, {(i, j): d for i, j, d in self.pangenome_graph.edges(data=True) if (i, j) in self.edmonds_graph.edges()})
         nx.set_node_attributes(self.edmonds_graph, {k: d for k, d in self.pangenome_graph.nodes(data=True) if k in self.edmonds_graph.nodes()})
+
+        add_start = []
+        for node in self.edmonds_graph.nodes():
+            if len(list(self.edmonds_graph.predecessors(node))) == 0:
+                add_start.append(node)
+
+        self.edmonds_graph.add_node(
+            'start',
+            name='start',
+            pos=(0, 0),
+            weight=len(self.genome_coloring.keys()),
+            genome={genome: {'draw': 'on'} for genome in self.genome_coloring.keys()}
+        )
+        
+        for u in add_start:
+
+            weight = self.edmonds_graph.nodes[u]['weight']
+            genomes = self.edmonds_graph.nodes[u]['genome'].keys()
+
+            self.edmonds_graph.add_edge(
+                *('start', u),
+                genome={genome: {'draw': 'on'} for genome in genomes},
+                weight=weight,
+                bended=[],
+                direction='R'
+            )
 
         self.run.info_single(f"Removing {pp(len(self.pangenome_graph.edges()) - len(self.edmonds_graph.edges()))} edges from G to create M")
         self.run.info_single("Done")
@@ -1524,7 +1534,7 @@ class Pangraph():
         pangenome_graph_nodes = set(self.pangenome_graph.nodes())
 
         edmonds_graph_removed_edges = pangenome_graph_edges - edmonds_graph_edges
-        edmonds_graph_end = max([(self.mean_edmonds_graph_path_weight('start', node), node) for node in edmonds_graph_nodes if len(list(self.pangenome_graph.successors(node))) == 0])[1]
+        edmonds_graph_end = max([(self.mean_edmonds_graph_path_weight('start', node), node) for node in edmonds_graph_nodes if len(list(self.edmonds_graph.successors(node))) == 0])[1]
 
         for graph in [self.pangenome_graph, self.edmonds_graph]:
 
@@ -1670,6 +1680,7 @@ class Pangraph():
                 visited_nodes.add(current_node)
             
                 if not nx.is_directed_acyclic_graph(self.edmonds_graph):
+                                        
                     print('Sanity Error. Code 6.')
                     exit()
 
@@ -2035,7 +2046,7 @@ class Pangraph():
                 instances_ancest_graph += len(list(attr['genome'].keys()))
 
         self.run.info_single(f"Total fraction of recovered genecall information {round((instances_ancest_graph/instances_pangenome_graph)*100, 3)}%")
-        self.run.info_single(f"Total fraction of recovered geneclusters {round((len(self.ancest.nodes())-2)/(len(self.pangenome_graph.nodes())-2)*100, 3)}%")
+        self.run.info_single(f"Total fraction of recovered geneclusters {round((len(self.ancest.nodes())-2)/(len(self.pangenome_graph.nodes())-1)*100, 3)}%")
 
         # NOTE: Any change in `jsondata` will require the pangraph JSON in anvio.tables.__init__
         #       to incrase by one (so that the new code that works with the new structure requires
