@@ -13,7 +13,7 @@ To list the collections available in this database, you can run
 
 {{ codestart }}
 anvi-export-collection -p %(pan-db)s \
-                        --list-colllections
+                        --list-collections
 {{ codestop }}
 
 You can also add the flag `--include-unbinned` to have all unbinned contigs in the database show up at the end of your %(collection-txt)s file in a bin titled `UNBINNED`. 
